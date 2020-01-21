@@ -19,6 +19,10 @@ public class tfTest extends LinearOpMode
     private static final String STONE = "stone";
     private static final String TFOD_MODEL_ASSET = "Skystone.tflite";
 
+
+    private static final int SIDES = 2;
+    private static final double THRESHOLD_LEFT = 270;
+    private static final double THRESHOLD_RIGHT = 400;
     private VuforiaLocalizer vuforia;
     private TFObjectDetector tfod;
 
@@ -72,7 +76,7 @@ public class tfTest extends LinearOpMode
             // The TFObjectDetector uses the camera frames from the VuforiaLocalizer, so we create that
             // first.
             initVuforia();
-
+            double power = 0;
             if (ClassFactory.getInstance().canCreateTFObjectDetector())
             {
                 initTfod();
@@ -91,7 +95,7 @@ public class tfTest extends LinearOpMode
                     tfod.activate();
                 }
 
-                while (opModeIsActive())
+                while (flag)
                 {
                     if (tfod != null)
                     {
@@ -101,12 +105,16 @@ public class tfTest extends LinearOpMode
                         if (updatedRecognitions != null)
                         {
                             telemetry.addData("# Object Detected", updatedRecognitions.size());
+                            telemetry.addData("power",power);
+                            power += 1;
                             for(Recognition recognition : updatedRecognitions)
                             {
-                                if(recognition.getLabel().equals(SKYSTONE))
+                                double recognitionSideAvg = (recognition.getRight()+recognition.getLeft())/SIDES;
+                                if(recognition.getLabel().equals(SKYSTONE) && recognitionSideAvg >= THRESHOLD_LEFT && recognitionSideAvg >= THRESHOLD_RIGHT)
                                 {
+                                    power = 0;
                                     telemetry.addData("skystone","found");
-                                    telemetry.addData("left val",recognition.getLeft());
+                                    telemetry.addData("recognitionSideAvg=",recognitionSideAvg);
                                 }
                             }
                             telemetry.update();
