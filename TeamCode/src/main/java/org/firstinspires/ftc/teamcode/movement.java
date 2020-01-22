@@ -146,12 +146,12 @@ public class movement extends LinearOpMode
         DcMotor motor3;
         DcMotor motor4;
         boolean flag = true;
-        driveThread(String m_motor1,String m_motor2,String m_motor3,String m_motor4)
+        driveThread(String NameMotor1,String NameMotor2,String NameMotor3,String NameMotor4)
         {
-            motor1Name = m_motor1;
-            motor2Name = m_motor2;
-            motor3Name = m_motor3;
-            motor4Name = m_motor4;
+            motor1Name = NameMotor1;
+            motor2Name = NameMotor2;
+            motor3Name = NameMotor3;
+            motor4Name = NameMotor4;
 
             motor1 = hardwareMap.dcMotor.get(motor1Name);
             motor2 = hardwareMap.dcMotor.get(motor2Name);
@@ -183,15 +183,35 @@ public class movement extends LinearOpMode
             double speed = 1;
             do
             {
+                //fast mode
                 if(gamepad1.left_bumper)
                 {
                     speed = 0.8;
                 }
+
+                //slow mode
                 if(gamepad1.right_bumper)
                 {
                     speed = 0.3;
                 }
 
+                //break mode
+                if(gamepad1.right_stick_button)
+                {
+                    motor1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+                    motor2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+                    motor3.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+                    motor4.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+                }
+                //float mode
+                else
+                {
+                    motor1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+                    motor2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+                    motor3.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+                    motor4.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+                }
+                //movement function
                 /*FL*/motor1Val = (normelize(sumValues(-gamepad1.left_stick_y,gamepad1.right_stick_x,gamepad1.left_stick_x)))*speed;
                 /*FR*/motor2Val = (normelize(sumValues(gamepad1.left_stick_y,gamepad1.right_stick_x,gamepad1.left_stick_x)))*speed;
                 /*BL*/motor3Val = (normelize(sumValues(-gamepad1.left_stick_y,gamepad1.right_stick_x,-gamepad1.left_stick_x)))*speed;
@@ -229,6 +249,11 @@ public class movement extends LinearOpMode
     @Override
     public void runOpMode () throws InterruptedException
     {
-
+        driveThread drive = new driveThread("FL","FR","BL","BR");
+        drive.start();
+        waitForStart();
+        //noinspection StatementWithEmptyBody
+        while (opModeIsActive());
+        drive.setFlag(false);
     }
 }
