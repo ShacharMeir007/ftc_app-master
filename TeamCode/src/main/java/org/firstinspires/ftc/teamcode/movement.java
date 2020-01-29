@@ -7,12 +7,64 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 
 
+
+
+
 @TeleOp(name = "manual")
 
 public class movement extends LinearOpMode
 {
     private static final double MAX_POWER = 1;
     private static final int YELLOW_ID   =  8;
+    private static final double KP = 1.0 / 200;
+
+
+    private static final double  DC_SERVO_MAX_POWER  = 0.15;
+
+    private class DcServo extends Thread
+    {
+        String name;
+        private DcMotor encoded_motor;
+        private double target = 0;
+        private double offset;
+        boolean flag = true;
+
+        DcServo(String tmpName)
+        {
+            name = tmpName;
+            encoded_motor = hardwareMap.dcMotor.get(name);
+            offset = encoded_motor.getCurrentPosition();
+        }
+
+        private void setTarget(double newVal)
+        {
+            target = newVal;
+        }
+
+        void setFlag(boolean newState)
+        {
+            flag = false;
+        }
+
+        @Override
+        public void run()
+        {
+            double kp = -1.0 / 200;
+            while (flag)
+            {
+                double position = encoded_motor.getCurrentPosition() - offset;
+                double error = target - position;
+                double power = error * kp;
+
+
+                if (power > DC_SERVO_MAX_POWER) power = DC_SERVO_MAX_POWER;
+                if (power < -DC_SERVO_MAX_POWER) power = -DC_SERVO_MAX_POWER;
+                encoded_motor.setPower(-power);
+            }
+        }
+    }
+
+
 
     class driveThread extends Thread
     {
@@ -69,7 +121,7 @@ public class movement extends LinearOpMode
                 //fast mode
                 if(gamepad1.left_bumper)
                 {
-                    speed = 0.8;
+                    speed = 1;
                 }
 
                 //slow mode
@@ -98,7 +150,7 @@ public class movement extends LinearOpMode
                 /*FL*/motor1Val = -(normelize(sumValues(-gamepad1.left_stick_y,gamepad1.right_stick_x,gamepad1.left_stick_x)))*speed;
                 /*FR*/motor2Val = -(normelize(sumValues(gamepad1.left_stick_y,gamepad1.right_stick_x,gamepad1.left_stick_x)))*speed;
                 /*BL*/motor3Val = -(normelize(sumValues(-gamepad1.left_stick_y,gamepad1.right_stick_x,-gamepad1.left_stick_x)))*speed;
-                /*BR*/motor4Val = (normelize(sumValues(gamepad1.left_stick_y,gamepad1.right_stick_x,-gamepad1.left_stick_x)))*speed;
+                /*BR*/motor4Val = -(normelize(sumValues(gamepad1.left_stick_y,gamepad1.right_stick_x,-gamepad1.left_stick_x)))*speed;
 
                 if(motor1Val==-1 && motor3Val == 1)
                 {
@@ -130,7 +182,7 @@ public class movement extends LinearOpMode
     class liftThread extends Thread
     {
         String sideMotorName;
-        DcMotor sideMotor;
+        DcServo sideMotor;
 
         String heightMotorName;
         DcMotor heightMotor;
@@ -140,7 +192,7 @@ public class movement extends LinearOpMode
         liftThread(String tmpSideMotorName ,String tmpHeightMotorName)
         {
             sideMotorName = tmpSideMotorName;
-            sideMotor = hardwareMap.dcMotor.get(sideMotorName);
+            sideMotor = new DcServo("side");
             heightMotorName = tmpHeightMotorName;
             heightMotor = hardwareMap.dcMotor.get(heightMotorName);
         }
@@ -152,11 +204,16 @@ public class movement extends LinearOpMode
 
         public void run()
         {
+            double position = 0;
             while(flag)
             {
-                sideMotor.setPower(gamepad1.right_trigger - gamepad1.left_trigger);
-                heightMotor.setPower(gamepad1.left_stick_y);
+                double sideMotorPower = gamepad2.right_trigger - gamepad2.left_trigger;
+                if(Math.abs(sideMotorPower) < 0.05) sideMotorPower = 0;
+                position += sideMotorPower;
+                sideMotor.setTarget(position);
+                heightMotor.setPower(gamepad2.left_stick_y);
             }
+            sideMotor.setFlag(false);
         }
     }
 
@@ -175,31 +232,40 @@ public class movement extends LinearOpMode
             flag = newFlag;
         }
 
-        pumpingThread(String tmpLeftPumpName, String tmpRightPumpName,String tmpColorSensorName )
+        pumpingThread(String tmpLeftPumpName, String tmpRightPumpName)
         {
             leftPumpName = tmpLeftPumpName;
             rightPumpName = tmpRightPumpName;
-            colorSensorName = tmpColorSensorName;
+            //colorSensorName = tmpColorSensorName;
             leftPump = hardwareMap.dcMotor.get(leftPumpName);
             rightPump = hardwareMap.dcMotor.get(rightPumpName);
-            colorSensor =  hardwareMap.get(ModernRoboticsI2cColorSensor.class, colorSensorName);
+            //colorSensor =  hardwareMap.get(ModernRoboticsI2cColorSensor.class, colorSensorName);
         }
 
         public void run()
         {
-            colorSensor.enableLed(true);
+            //colorSensor.enableLed(true);
             while(flag)
             {
-                while(gamepad1.a || colorSensor.readUnsignedByte(ModernRoboticsI2cColorSensor.Register.COLOR_NUMBER) == YELLOW_ID)
-                {
-                    rightPump.setPower(MAX_POWER);
-                    leftPump.setPower(-MAX_POWER);
+                    while(gamepad2.dpad_down)
+                    {
+                        rightPump.setPower(-MAX_POWER);
+                        leftPump.setPower(-(-MAX_POWER));
+                    }
+
+                    while(gamepad2.dpad_up)
+                    {
+                        rightPump.setPower(MAX_POWER);
+                        leftPump.setPower(-MAX_POWER * 0.7);
+                    }
+                    rightPump.setPower(0);
+                    leftPump.setPower(0);
                 }
                 rightPump.setPower(0);
                 leftPump.setPower(0);
             }
         }
-    }
+
 
     class catcherThread extends Thread
     {
@@ -229,11 +295,20 @@ public class movement extends LinearOpMode
         {
             while(flag)
             {
-                if(gamepad1.a)
+                if(gamepad2.right_bumper)
                 {
-                    totemCatcher.setPosition(0.5);
+                    blockCatcher.setPosition(0.7);
                 }
-                if(gamepad1.b)
+                if(gamepad2.left_bumper)
+                {
+                    blockCatcher.setPosition(0);
+                }
+
+                if(gamepad2.x)
+                {
+                    totemCatcher.setPosition(0.1);
+                }
+                if(gamepad2.y)
                 {
                     totemCatcher.setPosition(0);
                 }
@@ -241,14 +316,55 @@ public class movement extends LinearOpMode
         }
     }
 
+
+    class foundation_move extends Thread
+    {
+        Servo move;
+
+        String move_name;
+
+        boolean flag = false;
+
+        foundation_move(String tmp_move_name)
+        {
+            move_name = tmp_move_name;
+            move = hardwareMap.get(Servo.class,move_name);
+        }
+
+        void setFlag(boolean new_flag)
+        {
+            flag = new_flag;
+        }
+
+        public void run()
+        {
+            move.setPosition(0);
+            while (flag)
+            {
+                if(gamepad2.dpad_left)
+                {
+                    move.setPosition(0.7);
+                }
+                if(gamepad2.dpad_right)
+                {
+                    move.setPosition(0);
+                }
+            }
+        }
+
+    }
+
+
     @Override
     public void runOpMode ()
     {
         driveThread drive = new driveThread("FL","FR","BL","BR");
-        liftThread lift = new liftThread("","");
-        catcherThread catcher = new catcherThread("","");
-        pumpingThread pump = new pumpingThread("","","");
+        liftThread lift = new liftThread("side","height");
+        catcherThread catcher = new catcherThread("totem","block");
+        foundation_move move = new foundation_move("move");
+        pumpingThread pump = new pumpingThread("left_pump","right_pump");
         lift.start();
+        move.start();
         catcher.start();
         pump.start();
         drive.start();
@@ -258,6 +374,7 @@ public class movement extends LinearOpMode
         drive.setFlag(false);
         lift.setFlag(false);
         pump.setflag(false);
+        move.setFlag(false);
         catcher.setFlag(false);
     }
 }
