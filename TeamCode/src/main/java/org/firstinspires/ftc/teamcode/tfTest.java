@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -11,7 +12,7 @@ import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
 import java.util.List;
 
 @TeleOp(name = "tf test")
-
+@Disabled
 public class tfTest extends LinearOpMode
 {
     private static final String VUFORIA_KEY = "AUdml4//////AAABmeZVu2rww0Djk9HZI25Yl2tK9IRIqatToj5noMuDOFM8oAOwJ9sHqM2u1mEMS/7A4erXo2FAtiOKfHEPmkjKjVY0HFwcSihMHyAlJLPY+3BLatpNd87YkM1ONfjF9RqYKh4eZ5tQQZcvIZWddUWvdmogf2DAIzW518d5oxRtf88tdoBGpRKsn4Zi8D3WBdBYK68vLmkh6jDqSvQbp9yjvnj8u0RWGy6ZU1F9aVqvpa7nXJDVLxYdyrxcvW/dei3VJ8uqhTAKpEv2FHD39kJNiG0ftpghdmd5JiHprU/sgbc18XUuQQ983aW9zYl10ZYM0xMkcyl0BLcxLWxc8vZC5tpSFl138+NGFP8TEYyTITt4";

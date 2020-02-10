@@ -6,8 +6,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 
-
-
+import java.util.concurrent.TimeUnit;
 
 
 @TeleOp(name = "manual")
@@ -16,10 +15,10 @@ public class movement extends LinearOpMode
 {
     private static final double MAX_POWER = 1;
     private static final int YELLOW_ID   =  8;
-    private static final double KP = 1.0 / 200;
+    private static final double KP = -1.0 / 200;
 
 
-    private static final double  DC_SERVO_MAX_POWER  = 0.15;
+    private static final double  DC_SERVO_MAX_POWER  = 0.75;
 
     private class DcServo extends Thread
     {
@@ -28,12 +27,14 @@ public class movement extends LinearOpMode
         private double target = 0;
         private double offset;
         boolean flag = true;
-
-        DcServo(String tmpName)
+        private double position = 0;
+        double privateKP;
+        DcServo(String tmpName, double tmpPrivateKp)
         {
             name = tmpName;
             encoded_motor = hardwareMap.dcMotor.get(name);
             offset = encoded_motor.getCurrentPosition();
+            privateKP = tmpPrivateKp;
         }
 
         private void setTarget(double newVal)
@@ -49,14 +50,18 @@ public class movement extends LinearOpMode
         @Override
         public void run()
         {
-            double kp = -1.0 / 200;
             while (flag)
             {
-                double position = encoded_motor.getCurrentPosition() - offset;
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(10);
+                } catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                position = encoded_motor.getCurrentPosition() - offset;
                 double error = target - position;
-                double power = error * kp;
-
-
+                double power = error * KP * privateKP;
                 if (power > DC_SERVO_MAX_POWER) power = DC_SERVO_MAX_POWER;
                 if (power < -DC_SERVO_MAX_POWER) power = -DC_SERVO_MAX_POWER;
                 encoded_motor.setPower(-power);
@@ -66,7 +71,7 @@ public class movement extends LinearOpMode
 
 
 
-    class driveThread extends Thread
+    class driveThreadV2 extends Thread
     {
         String motor1Name;
         String motor2Name;
@@ -81,7 +86,7 @@ public class movement extends LinearOpMode
         DcMotor motor3;
         DcMotor motor4;
         boolean flag = true;
-        driveThread(String tmpNameMotor1,String tmpNameMotor2,String tmpNameMotor3,String tmpNameMotor4)
+        driveThreadV2(String tmpNameMotor1,String tmpNameMotor2,String tmpNameMotor3,String tmpNameMotor4)
         {
             motor1Name = tmpNameMotor1;
             motor2Name = tmpNameMotor2;
@@ -116,18 +121,21 @@ public class movement extends LinearOpMode
         public void run()
         {
             double speed = 1;
+            double side_factor = 0.6;
             do
             {
                 //fast mode
                 if(gamepad1.left_bumper)
                 {
                     speed = 1;
+                    side_factor = 0.6;
                 }
 
                 //slow mode
                 if(gamepad1.right_bumper)
                 {
                     speed = 0.3;
+                    side_factor = 1.6;
                 }
 
                 //break mode
@@ -147,10 +155,10 @@ public class movement extends LinearOpMode
                     motor4.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
                 }
                 //movement function
-                /*FL*/motor1Val = -(normelize(sumValues(-gamepad1.left_stick_y,gamepad1.right_stick_x,gamepad1.left_stick_x)))*speed;
-                /*FR*/motor2Val = -(normelize(sumValues(gamepad1.left_stick_y,gamepad1.right_stick_x,gamepad1.left_stick_x)))*speed;
-                /*BL*/motor3Val = -(normelize(sumValues(-gamepad1.left_stick_y,gamepad1.right_stick_x,-gamepad1.left_stick_x)))*speed;
-                /*BR*/motor4Val = -(normelize(sumValues(gamepad1.left_stick_y,gamepad1.right_stick_x,-gamepad1.left_stick_x)))*speed;
+                /*FL*/motor1Val = -(normelize(sumValues( gamepad1.left_stick_y, gamepad1.right_stick_x,-gamepad1.left_stick_x * side_factor)))*speed;
+                /*FR*/motor2Val = -(normelize(sumValues(-gamepad1.left_stick_y, gamepad1.right_stick_x,-gamepad1.left_stick_x * side_factor)))*speed;
+                /*BL*/motor3Val = -(normelize(sumValues( gamepad1.left_stick_y, gamepad1.right_stick_x, gamepad1.left_stick_x * side_factor)))*speed;
+                /*BR*/motor4Val = -(normelize(sumValues(-gamepad1.left_stick_y, gamepad1.right_stick_x, gamepad1.left_stick_x * side_factor)))*speed;
 
                 if(motor1Val==-1 && motor3Val == 1)
                 {
@@ -185,16 +193,16 @@ public class movement extends LinearOpMode
         DcServo sideMotor;
 
         String heightMotorName;
-        DcMotor heightMotor;
+        DcServo heightMotor;
 
         boolean flag = true;
 
         liftThread(String tmpSideMotorName ,String tmpHeightMotorName)
         {
             sideMotorName = tmpSideMotorName;
-            sideMotor = new DcServo("side");
+            sideMotor = new DcServo("side", 1);
             heightMotorName = tmpHeightMotorName;
-            heightMotor = hardwareMap.dcMotor.get(heightMotorName);
+            heightMotor = new DcServo(heightMotorName,1);
         }
 
         void setFlag(boolean newFlag)
@@ -204,16 +212,36 @@ public class movement extends LinearOpMode
 
         public void run()
         {
-            double position = 0;
+
+            double side_position = 0;
+            double height_position = 0;
+
+            double pTime = System.currentTimeMillis() / 1000.0;
+
+            sideMotor.start();
+            heightMotor.start();
             while(flag)
             {
+                double currentTime = System.currentTimeMillis() / 1000.0;
+                double dt  = currentTime - pTime;
+                pTime = currentTime;
                 double sideMotorPower = gamepad2.right_trigger - gamepad2.left_trigger;
-                if(Math.abs(sideMotorPower) < 0.05) sideMotorPower = 0;
-                position += sideMotorPower;
-                sideMotor.setTarget(position);
-                heightMotor.setPower(gamepad2.left_stick_y);
+                //if(Math.abs(sideMotorPower) < 0.05) sideMotorPower = 0;
+                side_position += sideMotorPower * dt * 750;
+                if(side_position < 0) side_position = 0;
+                if(side_position > 1475) side_position = 1475;
+                height_position += gamepad2.left_stick_y * dt * 1000;
+                if(height_position > 0) height_position = 0;
+                if(height_position < -1900) height_position = -1900;
+                telemetry.addData("height target", height_position);
+                telemetry.addData("height motor enc: ", heightMotor.position);
+                telemetry.update();
+                sideMotor.setTarget(side_position);
+                heightMotor.setTarget(height_position);
             }
             sideMotor.setFlag(false);
+            heightMotor.setFlag(false);
+
         }
     }
 
@@ -245,21 +273,37 @@ public class movement extends LinearOpMode
         public void run()
         {
             //colorSensor.enableLed(true);
+            int state = 0;
             while(flag)
             {
-                    while(gamepad2.dpad_down)
-                    {
-                        rightPump.setPower(-MAX_POWER);
-                        leftPump.setPower(-(-MAX_POWER));
-                    }
-
-                    while(gamepad2.dpad_up)
-                    {
+                switch(state)
+                {
+                    case 0: //stop
+                        rightPump.setPower(0);
+                        leftPump.setPower(0);
+                        break;
+                    case 1: //in
                         rightPump.setPower(MAX_POWER);
                         leftPump.setPower(-MAX_POWER * 0.7);
+                        break;
+                    case 2: //out
+                        rightPump.setPower(-MAX_POWER);
+                        leftPump.setPower(MAX_POWER);
+                        break;
+                }
+                    if(gamepad2.dpad_down)
+                    {
+                        state = 2;
                     }
-                    rightPump.setPower(0);
-                    leftPump.setPower(0);
+
+                    if(gamepad2.dpad_up)
+                    {
+                        state = 1;
+                    }
+                    if(gamepad2.dpad_right || gamepad2.dpad_left)
+                    {
+                        state = 0;
+                    }
                 }
                 rightPump.setPower(0);
                 leftPump.setPower(0);
@@ -306,11 +350,11 @@ public class movement extends LinearOpMode
 
                 if(gamepad2.x)
                 {
-                    totemCatcher.setPosition(0.1);
+                    totemCatcher.setPosition(0.6);
                 }
                 if(gamepad2.y)
                 {
-                    totemCatcher.setPosition(0);
+                    totemCatcher.setPosition(0.4);
                 }
             }
         }
@@ -323,7 +367,7 @@ public class movement extends LinearOpMode
 
         String move_name;
 
-        boolean flag = false;
+        boolean flag = true;
 
         foundation_move(String tmp_move_name)
         {
@@ -341,13 +385,13 @@ public class movement extends LinearOpMode
             move.setPosition(0);
             while (flag)
             {
-                if(gamepad2.dpad_left)
+                if(gamepad2.a)
                 {
-                    move.setPosition(0.7);
+                    move.setPosition(0.6);
                 }
-                if(gamepad2.dpad_right)
+                if(gamepad2.b)
                 {
-                    move.setPosition(0);
+                    move.setPosition(0.2);
                 }
             }
         }
@@ -358,20 +402,20 @@ public class movement extends LinearOpMode
     @Override
     public void runOpMode ()
     {
-        driveThread drive = new driveThread("FL","FR","BL","BR");
+        driveThreadV2 driveV2 = new driveThreadV2("FL","FR","BL","BR");
         liftThread lift = new liftThread("side","height");
         catcherThread catcher = new catcherThread("totem","block");
         foundation_move move = new foundation_move("move");
         pumpingThread pump = new pumpingThread("left_pump","right_pump");
-        lift.start();
+        driveV2.start();
         move.start();
+        lift.start();
         catcher.start();
         pump.start();
-        drive.start();
         waitForStart();
         //noinspection StatementWithEmptyBody
         while (opModeIsActive());
-        drive.setFlag(false);
+        driveV2.setFlag(false);
         lift.setFlag(false);
         pump.setflag(false);
         move.setFlag(false);
