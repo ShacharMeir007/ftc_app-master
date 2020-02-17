@@ -95,7 +95,6 @@ public class redAuto extends LinearOpMode
             // The TFObjectDetector uses the camera frames from the VuforiaLocalizer, so we create that
             // first.
             initVuforia();
-            double power = 0;
             if (ClassFactory.getInstance().canCreateTFObjectDetector())
             {
                 initTfod();
@@ -123,17 +122,21 @@ public class redAuto extends LinearOpMode
                         List<Recognition> updatedRecognitions = tfod.getUpdatedRecognitions();
                         if (updatedRecognitions != null)
                         {
-                            telemetry.addData("# Object Detected", updatedRecognitions.size());
-                            telemetry.addData("power",power);
-                            power += 1;
                             for(Recognition recognition : updatedRecognitions)
                             {
                                 double recognitionSideAvg = (recognition.getRight()+recognition.getLeft())/SIDES;
-                                if(recognition.getLabel().equals(SKYSTONE) && recognitionSideAvg >= THRESHOLD_LEFT && recognitionSideAvg >= THRESHOLD_RIGHT)
+                                double left = recognition.getLeft();
+                                double right = recognition.getRight();
+                                double up = recognition.getTop();
+                                double down = recognition.getBottom();
+                                if(recognition.getLabel().equals(SKYSTONE))
                                 {
-                                    power = 0;
                                     telemetry.addData("skystone","found");
-                                    telemetry.addData("recognitionSideAvg=",recognitionSideAvg);
+                                     telemetry.addData("left",left);
+                                     telemetry.addData("right",right);
+                                     telemetry.addData("up",up);
+                                     telemetry.addData("down",down);
+                                     flag = false;
                                 }
                             }
                             telemetry.update();
@@ -237,10 +240,6 @@ public class redAuto extends LinearOpMode
         String motor2Name;
         String motor3Name;
         String motor4Name;
-        double motor1Val;
-        double motor2Val;
-        double motor3Val;
-        double motor4Val;
         DcMotor motor1;
         DcMotor motor2;
         DcMotor motor3;
@@ -277,6 +276,14 @@ public class redAuto extends LinearOpMode
             return value;
         }
 
+
+        void powerForwardDrive(double power)
+        {
+            motor1.setPower(-power);
+            motor2.setPower(power);
+            motor3.setPower(-power);
+            motor4.setPower(power);
+        }
 
         void cmForwardDrive(double cm)
         {
@@ -393,6 +400,23 @@ public class redAuto extends LinearOpMode
         drive.moveSidecm(-45);
     }
 
+    void driveToSkystone(AutodriveThread drive,double power)
+    {
+        objectDetection finder = new objectDetection(true);
+        finder.start();
+        drive.moveSidecm(-70);
+        sleep(1000);
+        while(finder.flag)
+        {
+            drive.powerForwardDrive(0.2);
+            sleep(200);
+            drive.powerForwardDrive(0);
+        }
+        drive.powerForwardDrive(0);
+        telemetry.addData("found","found");
+        telemetry.update();
+    }
+
 
     @Override
     public void runOpMode () throws InterruptedException
@@ -401,10 +425,9 @@ public class redAuto extends LinearOpMode
       AutodriveThread drive = new AutodriveThread("FL","FR","BL","BR");
       Servo block = hardwareMap.servo.get("block");
       autoPump pump = new autoPump("left_pump","right_pump");
-      objectDetection oD = new objectDetection(true);
       waitForStart();
       //drive.moveSidecm(-210);
-
+        driveToSkystone(drive,0.2);
         //goToFoundation(move, drive, block, pump);
         //goBack(move, drive, block, pump);
 
