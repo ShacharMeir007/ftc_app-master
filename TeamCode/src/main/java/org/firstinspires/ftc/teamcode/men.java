@@ -9,7 +9,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 import java.util.concurrent.TimeUnit;
 
 
-@TeleOp(name = "manual")
+@TeleOp(name = "manual v2")
 
 public class men extends LinearOpMode
 {
@@ -159,13 +159,6 @@ public class men extends LinearOpMode
                 /*FR*/motor2Val = -(normelize(sumValues(-gamepad1.left_stick_y, gamepad1.right_stick_x,-gamepad1.left_stick_x * side_factor)))*speed;
                 /*BL*/motor3Val = -(normelize(sumValues( gamepad1.left_stick_y, gamepad1.right_stick_x, gamepad1.left_stick_x * side_factor)))*speed;
                 /*BR*/motor4Val = -(normelize(sumValues(-gamepad1.left_stick_y, gamepad1.right_stick_x, gamepad1.left_stick_x * side_factor)))*speed;
-
-                if(motor1Val==-1 && motor3Val == 1)
-                {
-                    motor2Val = 1;
-                    motor4Val = -1;
-                }
-
 
                 if(motor1Val==-1 && motor3Val == 1)
                 {
